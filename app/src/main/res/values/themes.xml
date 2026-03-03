@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.NotifAlarm" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/primaryGreen</item>
+        <item name="colorPrimaryVariant">@color/primaryGreenDark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">#FF8F00</item>
+        <item name="android:windowBackground">@color/bgLight</item>
+        <item name="android:statusBarColor">@color/primaryGreenDark</item>
+    </style>
+</resources>

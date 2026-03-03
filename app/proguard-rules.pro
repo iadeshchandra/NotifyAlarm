@@ -1,0 +1,4 @@
+-keep class com.yourname.notifalarm.** { *; }
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
