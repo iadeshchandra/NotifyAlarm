@@ -3,6 +3,7 @@ package com.yourname.notifalarm;
 import android.app.*;
 import android.content.*;
 import android.media.*;
+import android.net.Uri;
 import android.os.*;
 import androidx.core.app.NotificationCompat;
 
@@ -58,7 +59,6 @@ public class AlarmService extends Service {
         boolean vibrOn   = prefs.getBoolean(AppConstants.KEY_VIBRATE, true);
         int repeatMs     = prefs.getInt(AppConstants.KEY_REPEAT_MS, 2000);
 
-        // Wake lock: keep CPU alive on locked screen
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "NotifAlarm::Lock");
         if (!wakeLock.isHeld()) wakeLock.acquire(10 * 60 * 1000L);
@@ -84,11 +84,8 @@ public class AlarmService extends Service {
 
     private void playSound(int repeatMs) {
         try {
-            mediaPlayer = MediaPlayer.create(this, R.raw.alarm);
-            if (mediaPlayer == null) {
-                Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                mediaPlayer = MediaPlayer.create(this, uri);
-            }
+            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            mediaPlayer = MediaPlayer.create(this, uri);
             if (mediaPlayer != null) {
                 mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -100,28 +97,34 @@ public class AlarmService extends Service {
                 repeatRunnable = new Runnable() {
                     @Override public void run() {
                         if (isRunning && !isSnoozed && mediaPlayer != null) {
-                            try { mediaPlayer.seekTo(0); mediaPlayer.start(); } catch (Exception ignored) {}
+                            try {
+                                mediaPlayer.seekTo(0);
+                                mediaPlayer.start();
+                            } catch (Exception ignored) {}
                             repeatHandler.postDelayed(this, repeatMs);
                         }
                     }
                 };
                 repeatHandler.postDelayed(repeatRunnable, repeatMs);
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     // ── SNOOZE ────────────────────────────────────────────────────────────────
 
     private void snoozeAlarm() {
         isSnoozed = true;
-        if (mediaPlayer != null) { try { mediaPlayer.pause(); } catch (Exception ignored) {} }
+        if (mediaPlayer != null) {
+            try { mediaPlayer.pause(); } catch (Exception ignored) {}
+        }
         if (vibrator != null) vibrator.cancel();
         if (repeatRunnable != null) repeatHandler.removeCallbacks(repeatRunnable);
 
         SharedPreferences prefs = getSharedPreferences(AppConstants.PREF_NAME, MODE_PRIVATE);
         int snoozeMin = prefs.getInt(AppConstants.KEY_SNOOZE_MIN, 5);
 
-        // Resume alarm after snooze duration
         repeatHandler.postDelayed(() -> {
             if (isSnoozed && isRunning) {
                 isSnoozed = false;
@@ -151,7 +154,9 @@ public class AlarmService extends Service {
             mediaPlayer = null;
         }
         if (vibrator != null) { vibrator.cancel(); vibrator = null; }
-        if (wakeLock != null && wakeLock.isHeld()) { try { wakeLock.release(); } catch (Exception ignored) {} }
+        if (wakeLock != null && wakeLock.isHeld()) {
+            try { wakeLock.release(); } catch (Exception ignored) {}
+        }
         stopForeground(true);
         stopSelf();
         sendBroadcast(new Intent(AppConstants.ACTION_ALARM_STOPPED));
@@ -171,18 +176,20 @@ public class AlarmService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         PendingIntent piSnooze = PendingIntent.getService(this, 2,
-                new Intent(this, AlarmService.class).setAction(AppConstants.ACTION_SNOOZE_ALARM),
+                new Intent(this, AlarmService.class)
+                        .setAction(AppConstants.ACTION_SNOOZE_ALARM),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("🔔 " + (lastSource != null ? lastSource : "App") + " Alert!")
                 .setContentText(title != null && !title.isEmpty() ? title : text)
                 .setStyle(new NotificationCompat.BigTextStyle()
-                        .bigText((text != null ? text : "") + "\n\nKeyword: \"" + lastKeyword + "\""))
+                        .bigText((text != null ? text : "")
+                                + "\n\nKeyword: \"" + lastKeyword + "\""))
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentIntent(piOpen)
-                .addAction(android.R.drawable.ic_media_pause,  "💤 Snooze", piSnooze)
-                .addAction(android.R.drawable.ic_delete,        "⏹ Stop",   piStop)
+                .addAction(android.R.drawable.ic_media_pause, "💤 Snooze", piSnooze)
+                .addAction(android.R.drawable.ic_delete, "⏹ Stop", piStop)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -190,10 +197,13 @@ public class AlarmService extends Service {
                 .build();
     }
 
+    // ── CHANNEL ───────────────────────────────────────────────────────────────
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel ch = new NotificationChannel(
-                    CHANNEL_ID, "Alarm Alerts", NotificationManager.IMPORTANCE_HIGH);
+                    CHANNEL_ID, "Alarm Alerts",
+                    NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("Active when alarm is running");
             ch.setSound(null, null);
             ch.enableVibration(false);
@@ -203,11 +213,16 @@ public class AlarmService extends Service {
         }
     }
 
+    // ── STOP RECEIVER ─────────────────────────────────────────────────────────
+
     private void registerStopReceiver() {
         stopReceiver = new BroadcastReceiver() {
-            @Override public void onReceive(Context ctx, Intent intent) { stopAlarm(); }
+            @Override public void onReceive(Context ctx, Intent intent) {
+                stopAlarm();
+            }
         };
-        registerReceiver(stopReceiver, new IntentFilter(AppConstants.ACTION_STOP_ALARM));
+        registerReceiver(stopReceiver,
+                new IntentFilter(AppConstants.ACTION_STOP_ALARM));
     }
 
     @Override
